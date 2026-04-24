@@ -22,6 +22,12 @@
 .goalSection {
   margin-bottom: 40px;
 }
+.goalSection h2 {
+  font-size: 16px;
+  color: var(--text-main);
+  margin-bottom: 12px;
+  font-weight: 600;
+}
 
 .goalTabs {
   display: flex;
@@ -231,6 +237,39 @@
   margin-bottom: 20px;
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+.emptyStateBoard {
+  background-color: var(--card-bg);
+  border-radius: 16px;
+  padding: 30px;
+  text-align: center;
+  border: 1px dashed var(--pastel-green-hover);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+  margin-top: 20px;
+}
+.emptyStateBoard h2 {
+  font-size: 20px;
+  color: #4a7541;
+  margin-bottom: 15px;
+}
+.emptyStateBoard p {
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.emptyStateSmall {
+  background-color: transparent;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  border: 1px dashed var(--border-color);
+  margin-top: 10px;
+}
+.emptyStateSmall p {
+  color: var(--text-muted);
+  font-size: 14px;
 }
 .grid {
   display: grid;

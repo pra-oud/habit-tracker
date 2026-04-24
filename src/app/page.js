@@ -3,8 +3,54 @@
 import { useEffect, useState } from "react";
 import styles from "./page.module.css";
 import { supabase } from "../lib/supabase";
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
 
-export default function Home() {
+export default function App() {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (authLoading) {
+    return <div className={styles.container}><p>Loading...</p></div>;
+  }
+
+  if (!session) {
+    return (
+      <div className={styles.container}>
+        <header className={styles.header}>
+          <h1>Welcome to Habit Tracker</h1>
+          <p>Please log in or sign up to secure your data.</p>
+        </header>
+        <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '20px', border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+          <Auth 
+            supabaseClient={supabase} 
+            appearance={{ theme: ThemeSupa }} 
+            providers={[]} 
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return <Dashboard session={session} />;
+}
+
+function Dashboard({ session }) {
   // State for Goals
   const [goals, setGoals] = useState([]);
   const [activeGoalId, setActiveGoalId] = useState(null);
@@ -111,8 +157,9 @@ export default function Home() {
   }
 
   async function toggleCompletion(habitId) {
-    // Get today's date in YYYY-MM-DD
-    const today = new Date().toISOString().split('T')[0];
+    // Get today's date in local time (YYYY-MM-DD)
+    const d = new Date();
+    const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     
     // Check if already completed today
     const existingCompletion = completions.find(c => c.habit_id === habitId && c.completed_date === today);
@@ -135,14 +182,15 @@ export default function Home() {
   }
 
   // --- Calendar Logic ---
+  // Get today's date in local time to prevent timezone shifting bugs
   const todayDate = new Date();
-  const todayStr = todayDate.toISOString().split('T')[0];
+  const todayStr = todayDate.getFullYear() + '-' + String(todayDate.getMonth() + 1).padStart(2, '0') + '-' + String(todayDate.getDate()).padStart(2, '0');
 
   // Generate an array of the last 28 days
   const calendarDays = Array.from({ length: 28 }, (_, i) => {
     const d = new Date();
     d.setDate(todayDate.getDate() - (27 - i));
-    return d.toISOString().split('T')[0];
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   });
 
   // Calculate intensity (count of completions) per day
@@ -151,15 +199,28 @@ export default function Home() {
     completionsPerDay[c.completed_date] = (completionsPerDay[c.completed_date] || 0) + 1;
   });
 
+  const userEmail = session.user?.email || "";
+  const userName = userEmail ? userEmail.split('@')[0] : "Founder";
+  const formattedName = userName.charAt(0).toUpperCase() + userName.slice(1);
+
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <h1>Morning, Founder!</h1>
-        <p>Let's make today count.</p>
+      <header className={styles.header} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1>Morning, {formattedName}!</h1>
+          <p>Let's make today count.</p>
+        </div>
+        <button 
+          onClick={() => supabase.auth.signOut()}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
+        >
+          Sign Out
+        </button>
       </header>
 
       {/* Goal Selection Tabs */}
       <div className={styles.goalSection}>
+        <h2>Macro Goals (Big Picture)</h2>
         <div className={styles.goalTabs}>
           {goals.map(goal => (
             <button 
@@ -176,7 +237,7 @@ export default function Home() {
         <form className={styles.newGoalForm} onSubmit={addGoal}>
           <input 
             type="text" 
-            placeholder="Create a new Macro Goal..." 
+            placeholder="Step 1: Create a new Macro Goal..." 
             className={styles.goalInput}
             value={newGoalTitle}
             onChange={(e) => setNewGoalTitle(e.target.value)}
@@ -187,17 +248,25 @@ export default function Home() {
 
       {loading && <p style={{ color: 'var(--text-muted)' }}>Loading...</p>}
 
+      {!loading && goals.length === 0 && (
+        <div className={styles.emptyStateBoard}>
+          <h2>Welcome to your Dashboard! 🚀</h2>
+          <p><strong>Step 1:</strong> Start by creating a broad Macro Goal above (e.g., "Get Fit").</p>
+          <p><strong>Step 2:</strong> Once created, you can add daily Micro Habits to track your progress.</p>
+        </div>
+      )}
+
       {!loading && activeGoalId && (
         <>
           {/* Daily Dashboard */}
           <section className={styles.habitsList}>
-            <h2>Daily Habits for this Goal</h2>
+            <h2>Micro Habits (Daily Steps)</h2>
 
             {/* Add New Habit */}
             <form className={styles.addHabitForm} onSubmit={addHabit}>
               <input 
                 type="text" 
-                placeholder="Add a new daily habit..." 
+                placeholder="Step 2: Add a daily Micro Habit..." 
                 className={styles.habitInput}
                 value={newHabitTitle}
                 onChange={(e) => setNewHabitTitle(e.target.value)}
@@ -206,7 +275,9 @@ export default function Home() {
             </form>
             
             {habits.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>No habits for this goal yet.</p>
+              <div className={styles.emptyStateSmall}>
+                <p>Awesome! Now add a specific daily task above to start making progress.</p>
+              </div>
             ) : (
               habits.map((habit) => {
                 const isCompletedToday = completions.some(c => c.habit_id === habit.id && c.completed_date === todayStr);
@@ -252,10 +323,6 @@ export default function Home() {
             </div>
           </section>
         </>
-      )}
-
-      {!loading && goals.length === 0 && (
-        <p style={{ color: 'var(--text-muted)' }}>Create your first Macro Goal above to get started!</p>
       )}
     </div>
   );
