@@ -55,11 +55,13 @@ function Dashboard({ session }) {
   const [goals, setGoals] = useState([]);
   const [activeGoalId, setActiveGoalId] = useState(null);
   const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [isAddingGoal, setIsAddingGoal] = useState(false);
 
   // State for Habits and Completions
   const [habits, setHabits] = useState([]);
   const [completions, setCompletions] = useState([]);
   const [newHabitTitle, setNewHabitTitle] = useState("");
+  const [isAddingHabit, setIsAddingHabit] = useState(false);
   
   const [loading, setLoading] = useState(true);
 
@@ -127,6 +129,7 @@ function Dashboard({ session }) {
       setGoals([...goals, data[0]]);
       setActiveGoalId(data[0].id);
       setNewGoalTitle("");
+      setIsAddingGoal(false);
     }
   }
 
@@ -146,6 +149,7 @@ function Dashboard({ session }) {
 
     if (data) {
       setNewHabitTitle("");
+      setIsAddingHabit(false);
       setHabits([...habits, data[0]]);
     }
   }
@@ -231,19 +235,34 @@ function Dashboard({ session }) {
               {goal.title}
             </button>
           ))}
+          {goals.length > 0 && !isAddingGoal && (
+            <button 
+              className={styles.addGoalToggleBtn} 
+              onClick={() => setIsAddingGoal(true)}
+              title="Add new Macro Goal"
+            >
+              +
+            </button>
+          )}
         </div>
         
         {/* Add New Goal Form */}
-        <form className={styles.newGoalForm} onSubmit={addGoal}>
-          <input 
-            type="text" 
-            placeholder="Step 1: Create a new Macro Goal..." 
-            className={styles.goalInput}
-            value={newGoalTitle}
-            onChange={(e) => setNewGoalTitle(e.target.value)}
-          />
-          <button type="submit" className={styles.addGoalBtn}>+</button>
-        </form>
+        {(goals.length === 0 || isAddingGoal) && (
+          <form className={styles.newGoalForm} onSubmit={addGoal}>
+            <input 
+              type="text" 
+              placeholder="Step 1: Create a new Macro Goal..." 
+              className={styles.goalInput}
+              value={newGoalTitle}
+              onChange={(e) => setNewGoalTitle(e.target.value)}
+              autoFocus={isAddingGoal}
+            />
+            <button type="submit" className={styles.addGoalBtn}>Add</button>
+            {goals.length > 0 && (
+              <button type="button" className={styles.cancelBtn} onClick={() => setIsAddingGoal(false)}>Cancel</button>
+            )}
+          </form>
+        )}
       </div>
 
       {loading && <p style={{ color: 'var(--text-muted)' }}>Loading...</p>}
@@ -260,19 +279,35 @@ function Dashboard({ session }) {
         <>
           {/* Daily Dashboard */}
           <section className={styles.habitsList}>
-            <h2>Micro Habits (Daily Steps)</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <h2 style={{ marginBottom: 0 }}>Micro Habits (Daily Steps)</h2>
+              {habits.length > 0 && !isAddingHabit && (
+                <button 
+                  className={styles.addHabitToggleBtn}
+                  onClick={() => setIsAddingHabit(true)}
+                >
+                  + Add Habit
+                </button>
+              )}
+            </div>
 
-            {/* Add New Habit */}
-            <form className={styles.addHabitForm} onSubmit={addHabit}>
-              <input 
-                type="text" 
-                placeholder="Step 2: Add a daily Micro Habit..." 
-                className={styles.habitInput}
-                value={newHabitTitle}
-                onChange={(e) => setNewHabitTitle(e.target.value)}
-              />
-              <button type="submit" className={styles.addBtn}>Add</button>
-            </form>
+            {/* Add New Habit Form */}
+            {(habits.length === 0 || isAddingHabit) && (
+              <form className={styles.addHabitForm} onSubmit={addHabit}>
+                <input 
+                  type="text" 
+                  placeholder="Step 2: Add a daily Micro Habit..." 
+                  className={styles.habitInput}
+                  value={newHabitTitle}
+                  onChange={(e) => setNewHabitTitle(e.target.value)}
+                  autoFocus={isAddingHabit}
+                />
+                <button type="submit" className={styles.addBtn}>Add</button>
+                {habits.length > 0 && (
+                  <button type="button" className={styles.cancelBtn} onClick={() => setIsAddingHabit(false)}>Cancel</button>
+                )}
+              </form>
+            )}
             
             {habits.length === 0 ? (
               <div className={styles.emptyStateSmall}>

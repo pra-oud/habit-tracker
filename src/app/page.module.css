@@ -61,36 +61,72 @@
 .newGoalForm {
   display: flex;
   gap: 10px;
+  align-items: center;
 }
 .goalInput {
   flex: 1;
   padding: 10px 16px;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
+  border: 1px solid #ccc;
   font-family: inherit;
   font-size: 14px;
   outline: none;
-  background-color: transparent;
-  transition: border-color 0.2s ease;
+  background-color: #ffffff;
+  color: var(--text-main);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .goalInput:focus {
   border-color: var(--pastel-green-hover);
-  background-color: var(--card-bg);
+  box-shadow: 0 0 0 2px rgba(179, 223, 169, 0.3);
 }
 .addGoalBtn {
-  padding: 0 16px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  background-color: var(--pastel-green);
+  color: #4a7541;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.addGoalBtn:hover {
+  background-color: var(--pastel-green-hover);
+}
+.addGoalToggleBtn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  background-color: transparent;
+  border: 1px dashed var(--text-muted);
+  cursor: pointer;
+  font-weight: bold;
+  color: var(--text-muted);
+  font-size: 16px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.addGoalToggleBtn:hover {
+  background-color: var(--card-bg);
+  color: var(--text-main);
+  border-color: var(--text-main);
+}
+.cancelBtn {
+  padding: 10px 16px;
   border-radius: 12px;
   border: 1px solid var(--border-color);
   background-color: transparent;
   color: var(--text-muted);
-  font-weight: bold;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.addGoalBtn:hover {
-  background-color: var(--card-bg);
-  color: var(--text-main);
+.cancelBtn:hover {
+  background-color: #ffeaea;
+  color: #ff6b6b;
+  border-color: #ff6b6b;
 }
 
 .habitsList h2 {
@@ -110,15 +146,17 @@
   flex: 1;
   padding: 14px 20px;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
+  border: 1px solid #ccc;
   font-family: inherit;
   font-size: 15px;
   outline: none;
-  background-color: var(--card-bg);
-  transition: border-color 0.2s ease;
+  background-color: #ffffff;
+  color: var(--text-main);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .habitInput:focus {
   border-color: var(--pastel-green-hover);
+  box-shadow: 0 0 0 2px rgba(179, 223, 169, 0.3);
 }
 .addBtn {
   padding: 0 20px;
@@ -133,6 +171,22 @@
 }
 .addBtn:hover {
   background-color: var(--pastel-green-hover);
+}
+.addHabitToggleBtn {
+  padding: 6px 12px;
+  border-radius: 12px;
+  background-color: transparent;
+  border: 1px dashed var(--text-muted);
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+.addHabitToggleBtn:hover {
+  background-color: var(--pastel-green);
+  color: #4a7541;
+  border-color: var(--pastel-green-hover);
 }
 
 .habitCard {
