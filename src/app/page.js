@@ -71,6 +71,7 @@ function Dashboard({ session }) {
   const [newHabitTarget, setNewHabitTarget] = useState("");
   const [isAddingHabit, setIsAddingHabit] = useState(false);
   
+  const [calendarOffsetDays, setCalendarOffsetDays] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Date Logic
@@ -174,8 +175,8 @@ function Dashboard({ session }) {
   // --- Calendar & Analytics ---
   const calendarDays = Array.from({ length: 28 }, (_, i) => {
     const date = new Date();
-    date.setDate(date.getDate() - (27 - i));
-    return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+    date.setDate(date.getDate() - (27 - i) - calendarOffsetDays);
+    return date;
   });
 
   const completionsPerDay = {};
@@ -355,16 +356,29 @@ function Dashboard({ session }) {
           
           {/* Calendar Visualization */}
           <section className={styles.calendarWidget}>
-            <h2>Progress Intensity (Last 28 Days)</h2>
+            <div className={styles.calendarHeader}>
+              <h2>Progress Intensity</h2>
+              <div className={styles.calendarControls}>
+                <button onClick={() => setCalendarOffsetDays(prev => prev + 28)}>←</button>
+                <span>{calendarDays[0].toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {calendarDays[27].toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                <button onClick={() => setCalendarOffsetDays(prev => Math.max(0, prev - 28))} disabled={calendarOffsetDays === 0}>→</button>
+              </div>
+            </div>
             <div className={styles.grid}>
-              {calendarDays.map((dateStr) => {
+              {calendarDays.map((dateObj) => {
+                const dateStr = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + String(dateObj.getDate()).padStart(2, '0');
+                const dayNum = dateObj.getDate();
                 const count = completionsPerDay[dateStr] || 0;
                 let cellClass = styles.gridCell;
                 if (count === 1) cellClass += ` ${styles.activeCell1}`;
                 else if (count === 2) cellClass += ` ${styles.activeCell2}`;
                 else if (count >= 3) cellClass += ` ${styles.activeCell3}`;
                 
-                return <div key={dateStr} className={cellClass} title={`${count} completed on ${dateStr}`}></div>;
+                return (
+                  <div key={dateStr} className={cellClass} title={`${count} completed on ${dateStr}`}>
+                    <span className={styles.cellDay}>{dayNum}</span>
+                  </div>
+                );
               })}
             </div>
           </section>
