@@ -18,6 +18,46 @@
   color: var(--text-muted);
   font-size: 15px;
 }
+.signOutBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 14px;
+}
+
+.topNavTabs {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 10px;
+}
+.navTab {
+  background: none;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+.navTab:hover {
+  background-color: var(--card-bg);
+}
+.navTabActive {
+  background-color: var(--pastel-green);
+  color: #4a7541;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+}
 
 .goalSection {
   margin-bottom: 40px;
@@ -122,10 +162,11 @@
   color: var(--text-muted);
 }
 
-.newGoalForm {
+.newGoalFormExpanded {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 .goalInput {
   flex: 1;
@@ -142,6 +183,16 @@
 .goalInput:focus {
   border-color: var(--pastel-green-hover);
   box-shadow: 0 0 0 2px rgba(179, 223, 169, 0.3);
+}
+.targetDateInput {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--pastel-green-hover);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  color: var(--text-muted);
+  background-color: #ffffff;
 }
 .addGoalBtn {
   padding: 10px 20px;
@@ -434,6 +485,24 @@
   font-size: 14px;
   color: var(--text-muted);
   margin-bottom: 20px;
+}
+
+.insightsDashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.insightCard {
+  background-color: var(--card-bg);
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+}
+.insightCard h3 {
+  font-size: 16px;
+  color: var(--text-main);
+  margin-bottom: 15px;
 }
 .grid {
   display: grid;

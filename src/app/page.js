@@ -51,10 +51,14 @@ export default function App() {
 }
 
 function Dashboard({ session }) {
+  // Main Nav State
+  const [currentTab, setCurrentTab] = useState('track');
+
   // Goal State
   const [goals, setGoals] = useState([]);
   const [activeGoalId, setActiveGoalId] = useState(null);
   const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [newGoalTargetDate, setNewGoalTargetDate] = useState("");
   const [isAddingGoal, setIsAddingGoal] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState(null);
   const [editGoalTitle, setEditGoalTitle] = useState("");
@@ -108,11 +112,16 @@ function Dashboard({ session }) {
   async function addGoal(e) {
     e.preventDefault();
     if (!newGoalTitle.trim()) return;
-    const { data } = await supabase.from('goals').insert([{ title: newGoalTitle, subtitle: 'Focus on growth' }]).select();
+    const { data } = await supabase.from('goals').insert([{ 
+      title: newGoalTitle, 
+      subtitle: 'Focus on growth',
+      target_date: newGoalTargetDate || null
+    }]).select();
     if (data) {
       setGoals([...goals, data[0]]);
       setActiveGoalId(data[0].id);
       setNewGoalTitle("");
+      setNewGoalTargetDate("");
       setIsAddingGoal(false);
     }
   }
@@ -140,7 +149,7 @@ function Dashboard({ session }) {
 
     let finalTarget = 1;
     if (newHabitType === 'incremental' || newHabitType === 'numerical') finalTarget = parseInt(newHabitTarget) || 1;
-    if (newHabitType === 'timer') finalTarget = (parseInt(newHabitTarget) || 1) * 60; // Convert mins to seconds
+    if (newHabitType === 'timer') finalTarget = (parseInt(newHabitTarget) || 1) * 60;
 
     const icons = ['✨', '🚀', '⚡️', '🔥', '💧', '☀️', '🏃🏻‍♀️', '🧘🏻‍♂️'];
     const randomIcon = icons[Math.floor(Math.random() * icons.length)];
@@ -162,7 +171,7 @@ function Dashboard({ session }) {
     }
   }
 
-  // --- Calendar Generation ---
+  // --- Calendar & Analytics ---
   const calendarDays = Array.from({ length: 28 }, (_, i) => {
     const date = new Date();
     date.setDate(date.getDate() - (27 - i));
@@ -170,7 +179,6 @@ function Dashboard({ session }) {
   });
 
   const completionsPerDay = {};
-  // Count how many habits reached their target on each day
   completions.forEach(c => {
     const habit = habits.find(h => h.id === c.habit_id);
     if (habit && c.progress_value >= habit.target_value) {
@@ -189,15 +197,16 @@ function Dashboard({ session }) {
           <h1>Morning, {formattedName}!</h1>
           <p>Let's make today count.</p>
         </div>
-        <button 
-          onClick={() => supabase.auth.signOut()}
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline' }}
-        >
-          Sign Out
-        </button>
+        <button onClick={() => supabase.auth.signOut()} className={styles.signOutBtn}>Sign Out</button>
       </header>
 
-      {/* Goal Section */}
+      {/* Main Navigation */}
+      <div className={styles.topNavTabs}>
+        <button className={`${styles.navTab} ${currentTab === 'track' ? styles.navTabActive : ''}`} onClick={() => setCurrentTab('track')}>📋 Track Actions</button>
+        <button className={`${styles.navTab} ${currentTab === 'visualize' ? styles.navTabActive : ''}`} onClick={() => setCurrentTab('visualize')}>📊 Insights</button>
+      </div>
+
+      {/* Shared Goal Section */}
       <div className={styles.goalSection}>
         <h2>Macro Goals (Big Picture)</h2>
         <div className={styles.goalTabs}>
@@ -205,22 +214,13 @@ function Dashboard({ session }) {
             <div key={goal.id} className={styles.goalTabWrapper}>
               {editingGoalId === goal.id ? (
                 <div className={styles.goalEditRow}>
-                  <input 
-                    type="text" 
-                    value={editGoalTitle} 
-                    onChange={(e) => setEditGoalTitle(e.target.value)}
-                    className={styles.goalEditInput}
-                    autoFocus
-                  />
+                  <input type="text" value={editGoalTitle} onChange={(e) => setEditGoalTitle(e.target.value)} className={styles.goalEditInput} autoFocus />
                   <button onClick={() => saveGoalEdit(goal.id)} className={styles.saveBtn}>Save</button>
                   <button onClick={() => setEditingGoalId(null)} className={styles.cancelSmallBtn}>X</button>
                 </div>
               ) : (
                 <div className={`${styles.goalTabGroup} ${activeGoalId === goal.id ? styles.activeGroup : ''}`}>
-                  <button 
-                    className={`${styles.goalTab} ${activeGoalId === goal.id ? styles.active : ''}`}
-                    onClick={() => setActiveGoalId(goal.id)}
-                  >
+                  <button className={`${styles.goalTab} ${activeGoalId === goal.id ? styles.active : ''}`} onClick={() => setActiveGoalId(goal.id)}>
                     {goal.title}
                   </button>
                   {activeGoalId === goal.id && (
@@ -239,14 +239,22 @@ function Dashboard({ session }) {
         </div>
         
         {(goals.length === 0 || isAddingGoal) && (
-          <form className={styles.newGoalForm} onSubmit={addGoal}>
+          <form className={styles.newGoalFormExpanded} onSubmit={addGoal}>
             <input 
               type="text" 
-              placeholder="Step 1: Create a new Macro Goal..." 
+              placeholder="Step 1: Create a Macro Goal..." 
               className={styles.goalInput}
               value={newGoalTitle}
               onChange={(e) => setNewGoalTitle(e.target.value)}
               autoFocus={isAddingGoal}
+              required
+            />
+            <input 
+              type="date" 
+              className={styles.targetDateInput}
+              value={newGoalTargetDate}
+              onChange={(e) => setNewGoalTargetDate(e.target.value)}
+              title="Optional Deadline"
             />
             <button type="submit" className={styles.addGoalBtn}>Add</button>
             {goals.length > 0 && <button type="button" className={styles.cancelBtn} onClick={() => setIsAddingGoal(false)}>Cancel</button>}
@@ -264,87 +272,90 @@ function Dashboard({ session }) {
         </div>
       )}
 
-      {!loading && activeGoalId && (
-        <>
-          <section className={styles.habitsList}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <h2 style={{ marginBottom: 0 }}>Micro Habits (Daily Steps)</h2>
-              {habits.length > 0 && !isAddingHabit && (
-                <button className={styles.addHabitToggleBtn} onClick={() => setIsAddingHabit(true)}>+ Add Habit</button>
-              )}
-            </div>
+      {!loading && activeGoalId && currentTab === 'track' && (
+        <section className={styles.habitsList}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h2 style={{ marginBottom: 0 }}>Micro Habits (Daily Steps)</h2>
+            {habits.length > 0 && !isAddingHabit && (
+              <button className={styles.addHabitToggleBtn} onClick={() => setIsAddingHabit(true)}>+ Add Habit</button>
+            )}
+          </div>
 
-            {(habits.length === 0 || isAddingHabit) && (
-              <form className={styles.addHabitFormExpanded} onSubmit={addHabit}>
+          {(habits.length === 0 || isAddingHabit) && (
+            <form className={styles.addHabitFormExpanded} onSubmit={addHabit}>
+              <div className={styles.formRow}>
+                <select className={styles.typeSelect} value={newHabitType} onChange={(e) => setNewHabitType(e.target.value)}>
+                  <option value="checkbox">✓ Checkbox</option>
+                  <option value="incremental">+ Incremental</option>
+                  <option value="numerical"># Numerical</option>
+                  <option value="timer">⏱ Timer</option>
+                </select>
+                <input 
+                  type="text" 
+                  placeholder="Habit name..." 
+                  className={styles.habitInputFull}
+                  value={newHabitTitle}
+                  onChange={(e) => setNewHabitTitle(e.target.value)}
+                  autoFocus={isAddingHabit}
+                  required
+                />
+              </div>
+              
+              {newHabitType !== 'checkbox' && (
                 <div className={styles.formRow}>
-                  <select 
-                    className={styles.typeSelect} 
-                    value={newHabitType} 
-                    onChange={(e) => setNewHabitType(e.target.value)}
-                  >
-                    <option value="checkbox">✓ Checkbox</option>
-                    <option value="incremental">+ Incremental</option>
-                    <option value="numerical"># Numerical</option>
-                    <option value="timer">⏱ Timer</option>
-                  </select>
                   <input 
-                    type="text" 
-                    placeholder="Habit name..." 
-                    className={styles.habitInputFull}
-                    value={newHabitTitle}
-                    onChange={(e) => setNewHabitTitle(e.target.value)}
-                    autoFocus={isAddingHabit}
+                    type="number" 
+                    placeholder={newHabitType === 'timer' ? 'Target in minutes...' : 'Target value...'} 
+                    className={styles.targetInput}
+                    value={newHabitTarget}
+                    onChange={(e) => setNewHabitTarget(e.target.value)}
+                    required
+                    min="1"
                   />
                 </div>
-                
-                {newHabitType !== 'checkbox' && (
-                  <div className={styles.formRow}>
-                    <input 
-                      type="number" 
-                      placeholder={newHabitType === 'timer' ? 'Target in minutes...' : 'Target value...'} 
-                      className={styles.targetInput}
-                      value={newHabitTarget}
-                      onChange={(e) => setNewHabitTarget(e.target.value)}
-                      required
-                      min="1"
-                    />
-                  </div>
-                )}
-                
-                <div className={styles.formActions}>
-                  <button type="submit" className={styles.addBtn}>Save Habit</button>
-                  {habits.length > 0 && <button type="button" className={styles.cancelBtn} onClick={() => setIsAddingHabit(false)}>Cancel</button>}
-                </div>
-              </form>
-            )}
-            
-            {habits.length === 0 ? (
-              <div className={styles.emptyStateSmall}>
-                <p>Awesome! Now add a specific daily task above to start making progress.</p>
+              )}
+              
+              <div className={styles.formActions}>
+                <button type="submit" className={styles.addBtn}>Save Habit</button>
+                {habits.length > 0 && <button type="button" className={styles.cancelBtn} onClick={() => setIsAddingHabit(false)}>Cancel</button>}
               </div>
-            ) : (
-              habits.map((habit) => (
-                <HabitCard 
-                  key={habit.id} 
-                  habit={habit} 
-                  todayStr={todayStr}
-                  completions={completions} 
-                  setCompletions={setCompletions}
-                  onDelete={() => {
-                    supabase.from('habits').delete().eq('id', habit.id).then(() => {
-                      setHabits(habits.filter(h => h.id !== habit.id));
-                    });
-                  }}
-                  onUpdateTitle={(newTitle) => {
-                    setHabits(habits.map(h => h.id === habit.id ? { ...h, title: newTitle } : h));
-                  }}
-                />
-              ))
-            )}
-          </section>
+            </form>
+          )}
+          
+          {habits.length === 0 ? (
+            <div className={styles.emptyStateSmall}>
+              <p>Awesome! Now add a specific daily task above to start making progress.</p>
+            </div>
+          ) : (
+            habits.map((habit) => (
+              <HabitCard 
+                key={habit.id} 
+                habit={habit} 
+                todayStr={todayStr}
+                completions={completions} 
+                setCompletions={setCompletions}
+                onDelete={() => {
+                  supabase.from('habits').delete().eq('id', habit.id).then(() => {
+                    setHabits(habits.filter(h => h.id !== habit.id));
+                  });
+                }}
+                onUpdateTitle={(newTitle) => {
+                  setHabits(habits.map(h => h.id === habit.id ? { ...h, title: newTitle } : h));
+                }}
+              />
+            ))
+          )}
+        </section>
+      )}
 
+      {!loading && activeGoalId && currentTab === 'visualize' && (
+        <div className={styles.insightsDashboard}>
+          {/* Deadline Visualization */}
+          <DeadlineTracker goal={goals.find(g => g.id === activeGoalId)} />
+          
+          {/* Calendar Visualization */}
           <section className={styles.calendarWidget}>
-            <h2>Progress Calendar (Last 28 Days)</h2>
+            <h2>Progress Intensity (Last 28 Days)</h2>
             <div className={styles.grid}>
               {calendarDays.map((dateStr) => {
                 const count = completionsPerDay[dateStr] || 0;
@@ -357,8 +368,47 @@ function Dashboard({ session }) {
               })}
             </div>
           </section>
-        </>
+        </div>
       )}
+    </div>
+  );
+}
+
+function DeadlineTracker({ goal }) {
+  if (!goal) return null;
+
+  if (!goal.target_date) {
+    return (
+      <div className={styles.insightCard}>
+        <h3>🎯 Target Deadline</h3>
+        <p style={{ color: 'var(--text-muted)' }}>No deadline set. This is a forever goal! 🚀</p>
+      </div>
+    );
+  }
+
+  const start = new Date(goal.created_at).getTime();
+  const target = new Date(goal.target_date).getTime();
+  const today = new Date().getTime();
+
+  const totalDays = Math.max(1, Math.ceil((target - start) / (1000 * 60 * 60 * 24)));
+  const elapsedDays = Math.ceil((today - start) / (1000 * 60 * 60 * 24));
+  const remainingDays = totalDays - elapsedDays;
+  
+  const percent = Math.min(100, Math.max(0, Math.round((elapsedDays / totalDays) * 100)));
+
+  return (
+    <div className={styles.insightCard}>
+      <h3>⏳ Deadline Countdown</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <span style={{ fontWeight: 'bold', fontSize: '15px' }}>{remainingDays > 0 ? `${remainingDays} days remaining` : 'Deadline passed!'}</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>{percent}% Elapsed</span>
+      </div>
+      <div className={styles.progressBarBg}>
+        <div className={styles.progressBarFill} style={{ width: `${percent}%`, backgroundColor: percent >= 90 ? '#ff6b6b' : 'var(--pastel-green-hover)' }}></div>
+      </div>
+      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '10px' }}>
+        Target Date: {new Date(goal.target_date).toLocaleDateString()}
+      </p>
     </div>
   );
 }
@@ -377,12 +427,10 @@ function HabitCard({ habit, todayStr, completions, setCompletions, onDelete, onU
   const [timerSeconds, setTimerSeconds] = useState(currentProgress);
   const intervalRef = useRef(null);
 
-  // Sync timer when externally updated
   useEffect(() => {
     if (!isRunning) setTimerSeconds(currentProgress);
   }, [currentProgress, isRunning]);
 
-  // Stopwatch Logic
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
@@ -437,7 +485,6 @@ function HabitCard({ habit, todayStr, completions, setCompletions, onDelete, onU
     setIsEditing(false);
   }
 
-  // Calculate Progress Bar width
   const progressPercent = Math.min(100, Math.round((currentProgress / habit.target_value) * 100));
 
   return (
@@ -448,13 +495,7 @@ function HabitCard({ habit, todayStr, completions, setCompletions, onDelete, onU
           <div style={{ flex: 1 }}>
             {isEditing ? (
               <div className={styles.editRow}>
-                <input 
-                  type="text" 
-                  value={editTitle} 
-                  onChange={(e) => setEditTitle(e.target.value)} 
-                  className={styles.goalEditInput}
-                  autoFocus
-                />
+                <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className={styles.goalEditInput} autoFocus />
                 <button onClick={saveEdit} className={styles.saveBtn}>Save</button>
                 <button onClick={() => setIsEditing(false)} className={styles.cancelSmallBtn}>X</button>
               </div>
@@ -465,7 +506,6 @@ function HabitCard({ habit, todayStr, completions, setCompletions, onDelete, onU
               </h3>
             )}
             
-            {/* Progress Bar for non-checkbox types */}
             {habit.type !== 'checkbox' && (
               <div className={styles.progressBarBg}>
                 <div className={styles.progressBarFill} style={{ width: `${isRunning ? Math.min(100, (timerSeconds/habit.target_value)*100) : progressPercent}%` }}></div>
@@ -478,17 +518,12 @@ function HabitCard({ habit, todayStr, completions, setCompletions, onDelete, onU
       <div className={styles.habitActions}>
         <button className={styles.deleteBtn} onClick={onDelete}>🗑️</button>
 
-        {/* 1. Checkbox Logic */}
         {habit.type === 'checkbox' && (
-          <button 
-            className={isCompleted ? styles.checkButton : styles.emptyCircle}
-            onClick={() => updateProgress(isCompleted ? 0 : 1)}
-          >
+          <button className={isCompleted ? styles.checkButton : styles.emptyCircle} onClick={() => updateProgress(isCompleted ? 0 : 1)}>
             {isCompleted ? '✓' : ''}
           </button>
         )}
 
-        {/* 2. Incremental Logic */}
         {habit.type === 'incremental' && (
           <div className={styles.controlGroup}>
             <button className={styles.circleBtn} onClick={() => updateProgress(currentProgress - 1)}>-</button>
@@ -497,34 +532,23 @@ function HabitCard({ habit, todayStr, completions, setCompletions, onDelete, onU
           </div>
         )}
 
-        {/* 3. Numerical Logic */}
         {habit.type === 'numerical' && (
           <div className={styles.controlGroup}>
-            <input 
-              type="number" 
-              className={styles.numberInlineInput}
-              value={currentProgress === 0 ? "" : currentProgress}
-              placeholder="0"
-              onChange={(e) => updateProgress(parseInt(e.target.value) || 0)}
-            />
+            <input type="number" className={styles.numberInlineInput} value={currentProgress === 0 ? "" : currentProgress} placeholder="0" onChange={(e) => updateProgress(parseInt(e.target.value) || 0)} />
             <span className={styles.progressText}>/ {habit.target_value}</span>
           </div>
         )}
 
-        {/* 4. Timer Logic */}
         {habit.type === 'timer' && (
           <div className={styles.controlGroup}>
             <span className={styles.progressText}>{formatTime(timerSeconds)} / {formatTime(habit.target_value)}</span>
             {isCompleted ? (
               <span className={styles.completedBadge}>✓</span>
             ) : (
-              <button 
-                className={`${styles.playBtn} ${isRunning ? styles.running : ''}`} 
-                onClick={() => {
+              <button className={`${styles.playBtn} ${isRunning ? styles.running : ''}`} onClick={() => {
                   if (isRunning) { setIsRunning(false); updateProgress(timerSeconds); }
                   else { setIsRunning(true); }
-                }}
-              >
+                }}>
                 {isRunning ? '⏸' : '▶'}
               </button>
             )}
