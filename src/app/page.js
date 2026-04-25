@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import styles from "./page.module.css";
 import { supabase } from "../lib/supabase";
 import { Auth } from '@supabase/auth-ui-react';
@@ -51,38 +51,37 @@ export default function App() {
 }
 
 function Dashboard({ session }) {
-  // State for Goals
+  // Goal State
   const [goals, setGoals] = useState([]);
   const [activeGoalId, setActiveGoalId] = useState(null);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [isAddingGoal, setIsAddingGoal] = useState(false);
+  const [editingGoalId, setEditingGoalId] = useState(null);
+  const [editGoalTitle, setEditGoalTitle] = useState("");
 
-  // State for Habits and Completions
+  // Habit State
   const [habits, setHabits] = useState([]);
   const [completions, setCompletions] = useState([]);
   const [newHabitTitle, setNewHabitTitle] = useState("");
+  const [newHabitType, setNewHabitType] = useState("checkbox");
+  const [newHabitTarget, setNewHabitTarget] = useState("");
   const [isAddingHabit, setIsAddingHabit] = useState(false);
   
   const [loading, setLoading] = useState(true);
 
-  // 1. Initial Load: Fetch Goals
-  useEffect(() => {
-    fetchGoals();
-  }, []);
+  // Date Logic
+  const d = new Date();
+  const todayStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 
-  // 2. When Active Goal changes, fetch its habits and completions
+  useEffect(() => { fetchGoals(); }, []);
   useEffect(() => {
-    if (activeGoalId) {
-      fetchHabitsAndCompletions(activeGoalId);
-    } else {
-      setHabits([]);
-      setCompletions([]);
-    }
+    if (activeGoalId) fetchHabitsAndCompletions(activeGoalId);
+    else { setHabits([]); setCompletions([]); }
   }, [activeGoalId]);
 
   async function fetchGoals() {
     setLoading(true);
-    const { data, error } = await supabase.from('goals').select('*').order('created_at', { ascending: true });
+    const { data } = await supabase.from('goals').select('*').order('created_at', { ascending: true });
     if (data && data.length > 0) {
       setGoals(data);
       if (!activeGoalId) setActiveGoalId(data[0].id);
@@ -92,22 +91,12 @@ function Dashboard({ session }) {
 
   async function fetchHabitsAndCompletions(goalId) {
     setLoading(true);
-    // Fetch habits for this goal
-    const { data: habitsData } = await supabase
-      .from('habits')
-      .select('*')
-      .eq('goal_id', goalId)
-      .order('created_at', { ascending: true });
-    
+    const { data: habitsData } = await supabase.from('habits').select('*').eq('goal_id', goalId).order('created_at', { ascending: true });
     setHabits(habitsData || []);
 
-    // Fetch completions
     if (habitsData && habitsData.length > 0) {
       const habitIds = habitsData.map(h => h.id);
-      const { data: completionsData } = await supabase
-        .from('completions')
-        .select('*')
-        .in('habit_id', habitIds);
+      const { data: completionsData } = await supabase.from('completions').select('*').in('habit_id', habitIds);
       setCompletions(completionsData || []);
     } else {
       setCompletions([]);
@@ -115,16 +104,11 @@ function Dashboard({ session }) {
     setLoading(false);
   }
 
-  // --- Add/Delete Goal ---
+  // --- Goal Actions ---
   async function addGoal(e) {
     e.preventDefault();
     if (!newGoalTitle.trim()) return;
-    
-    const { data } = await supabase.from('goals').insert([{ 
-      title: newGoalTitle, 
-      subtitle: 'Focus on growth' 
-    }]).select();
-
+    const { data } = await supabase.from('goals').insert([{ title: newGoalTitle, subtitle: 'Focus on growth' }]).select();
     if (data) {
       setGoals([...goals, data[0]]);
       setActiveGoalId(data[0].id);
@@ -133,10 +117,30 @@ function Dashboard({ session }) {
     }
   }
 
-  // --- Add/Delete/Toggle Habit ---
+  async function saveGoalEdit(id) {
+    if (!editGoalTitle.trim()) return;
+    await supabase.from('goals').update({ title: editGoalTitle }).eq('id', id);
+    setGoals(goals.map(g => g.id === id ? { ...g, title: editGoalTitle } : g));
+    setEditingGoalId(null);
+  }
+
+  async function deleteGoal(id) {
+    await supabase.from('goals').delete().eq('id', id);
+    const updatedGoals = goals.filter(g => g.id !== id);
+    setGoals(updatedGoals);
+    if (activeGoalId === id) {
+      setActiveGoalId(updatedGoals.length > 0 ? updatedGoals[0].id : null);
+    }
+  }
+
+  // --- Habit Actions ---
   async function addHabit(e) {
     e.preventDefault();
     if (!newHabitTitle.trim() || !activeGoalId) return;
+
+    let finalTarget = 1;
+    if (newHabitType === 'incremental' || newHabitType === 'numerical') finalTarget = parseInt(newHabitTarget) || 1;
+    if (newHabitType === 'timer') finalTarget = (parseInt(newHabitTarget) || 1) * 60; // Convert mins to seconds
 
     const icons = ['✨', '🚀', '⚡️', '🔥', '💧', '☀️', '🏃🏻‍♀️', '🧘🏻‍♂️'];
     const randomIcon = icons[Math.floor(Math.random() * icons.length)];
@@ -144,63 +148,34 @@ function Dashboard({ session }) {
     const { data } = await supabase.from('habits').insert([{ 
       title: newHabitTitle, 
       icon: randomIcon,
-      goal_id: activeGoalId
+      goal_id: activeGoalId,
+      type: newHabitType,
+      target_value: finalTarget
     }]).select();
 
     if (data) {
       setNewHabitTitle("");
+      setNewHabitTarget("");
+      setNewHabitType("checkbox");
       setIsAddingHabit(false);
       setHabits([...habits, data[0]]);
     }
   }
 
-  async function deleteHabit(habitId) {
-    await supabase.from('habits').delete().eq('id', habitId);
-    setHabits(habits.filter(h => h.id !== habitId));
-    setCompletions(completions.filter(c => c.habit_id !== habitId));
-  }
-
-  async function toggleCompletion(habitId) {
-    // Get today's date in local time (YYYY-MM-DD)
-    const d = new Date();
-    const today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    
-    // Check if already completed today
-    const existingCompletion = completions.find(c => c.habit_id === habitId && c.completed_date === today);
-
-    if (existingCompletion) {
-      // Uncheck it
-      await supabase.from('completions').delete().eq('id', existingCompletion.id);
-      setCompletions(completions.filter(c => c.id !== existingCompletion.id));
-    } else {
-      // Check it
-      const { data } = await supabase.from('completions').insert([{ 
-        habit_id: habitId, 
-        completed_date: today 
-      }]).select();
-      
-      if (data) {
-        setCompletions([...completions, data[0]]);
-      }
-    }
-  }
-
-  // --- Calendar Logic ---
-  // Get today's date in local time to prevent timezone shifting bugs
-  const todayDate = new Date();
-  const todayStr = todayDate.getFullYear() + '-' + String(todayDate.getMonth() + 1).padStart(2, '0') + '-' + String(todayDate.getDate()).padStart(2, '0');
-
-  // Generate an array of the last 28 days
+  // --- Calendar Generation ---
   const calendarDays = Array.from({ length: 28 }, (_, i) => {
-    const d = new Date();
-    d.setDate(todayDate.getDate() - (27 - i));
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const date = new Date();
+    date.setDate(date.getDate() - (27 - i));
+    return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
   });
 
-  // Calculate intensity (count of completions) per day
   const completionsPerDay = {};
+  // Count how many habits reached their target on each day
   completions.forEach(c => {
-    completionsPerDay[c.completed_date] = (completionsPerDay[c.completed_date] || 0) + 1;
+    const habit = habits.find(h => h.id === c.habit_id);
+    if (habit && c.progress_value >= habit.target_value) {
+      completionsPerDay[c.completed_date] = (completionsPerDay[c.completed_date] || 0) + 1;
+    }
   });
 
   const userEmail = session.user?.email || "";
@@ -222,31 +197,47 @@ function Dashboard({ session }) {
         </button>
       </header>
 
-      {/* Goal Selection Tabs */}
+      {/* Goal Section */}
       <div className={styles.goalSection}>
         <h2>Macro Goals (Big Picture)</h2>
         <div className={styles.goalTabs}>
           {goals.map(goal => (
-            <button 
-              key={goal.id}
-              className={`${styles.goalTab} ${activeGoalId === goal.id ? styles.active : ''}`}
-              onClick={() => setActiveGoalId(goal.id)}
-            >
-              {goal.title}
-            </button>
+            <div key={goal.id} className={styles.goalTabWrapper}>
+              {editingGoalId === goal.id ? (
+                <div className={styles.goalEditRow}>
+                  <input 
+                    type="text" 
+                    value={editGoalTitle} 
+                    onChange={(e) => setEditGoalTitle(e.target.value)}
+                    className={styles.goalEditInput}
+                    autoFocus
+                  />
+                  <button onClick={() => saveGoalEdit(goal.id)} className={styles.saveBtn}>Save</button>
+                  <button onClick={() => setEditingGoalId(null)} className={styles.cancelSmallBtn}>X</button>
+                </div>
+              ) : (
+                <div className={`${styles.goalTabGroup} ${activeGoalId === goal.id ? styles.activeGroup : ''}`}>
+                  <button 
+                    className={`${styles.goalTab} ${activeGoalId === goal.id ? styles.active : ''}`}
+                    onClick={() => setActiveGoalId(goal.id)}
+                  >
+                    {goal.title}
+                  </button>
+                  {activeGoalId === goal.id && (
+                    <div className={styles.goalActions}>
+                      <button onClick={() => { setEditingGoalId(goal.id); setEditGoalTitle(goal.title); }} title="Edit">✏️</button>
+                      <button onClick={() => deleteGoal(goal.id)} title="Delete">🗑️</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
           {goals.length > 0 && !isAddingGoal && (
-            <button 
-              className={styles.addGoalToggleBtn} 
-              onClick={() => setIsAddingGoal(true)}
-              title="Add new Macro Goal"
-            >
-              +
-            </button>
+            <button className={styles.addGoalToggleBtn} onClick={() => setIsAddingGoal(true)} title="Add new Macro Goal">+</button>
           )}
         </div>
         
-        {/* Add New Goal Form */}
         {(goals.length === 0 || isAddingGoal) && (
           <form className={styles.newGoalForm} onSubmit={addGoal}>
             <input 
@@ -258,9 +249,7 @@ function Dashboard({ session }) {
               autoFocus={isAddingGoal}
             />
             <button type="submit" className={styles.addGoalBtn}>Add</button>
-            {goals.length > 0 && (
-              <button type="button" className={styles.cancelBtn} onClick={() => setIsAddingGoal(false)}>Cancel</button>
-            )}
+            {goals.length > 0 && <button type="button" className={styles.cancelBtn} onClick={() => setIsAddingGoal(false)}>Cancel</button>}
           </form>
         )}
       </div>
@@ -277,35 +266,55 @@ function Dashboard({ session }) {
 
       {!loading && activeGoalId && (
         <>
-          {/* Daily Dashboard */}
           <section className={styles.habitsList}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
               <h2 style={{ marginBottom: 0 }}>Micro Habits (Daily Steps)</h2>
               {habits.length > 0 && !isAddingHabit && (
-                <button 
-                  className={styles.addHabitToggleBtn}
-                  onClick={() => setIsAddingHabit(true)}
-                >
-                  + Add Habit
-                </button>
+                <button className={styles.addHabitToggleBtn} onClick={() => setIsAddingHabit(true)}>+ Add Habit</button>
               )}
             </div>
 
-            {/* Add New Habit Form */}
             {(habits.length === 0 || isAddingHabit) && (
-              <form className={styles.addHabitForm} onSubmit={addHabit}>
-                <input 
-                  type="text" 
-                  placeholder="Step 2: Add a daily Micro Habit..." 
-                  className={styles.habitInput}
-                  value={newHabitTitle}
-                  onChange={(e) => setNewHabitTitle(e.target.value)}
-                  autoFocus={isAddingHabit}
-                />
-                <button type="submit" className={styles.addBtn}>Add</button>
-                {habits.length > 0 && (
-                  <button type="button" className={styles.cancelBtn} onClick={() => setIsAddingHabit(false)}>Cancel</button>
+              <form className={styles.addHabitFormExpanded} onSubmit={addHabit}>
+                <div className={styles.formRow}>
+                  <select 
+                    className={styles.typeSelect} 
+                    value={newHabitType} 
+                    onChange={(e) => setNewHabitType(e.target.value)}
+                  >
+                    <option value="checkbox">✓ Checkbox</option>
+                    <option value="incremental">+ Incremental</option>
+                    <option value="numerical"># Numerical</option>
+                    <option value="timer">⏱ Timer</option>
+                  </select>
+                  <input 
+                    type="text" 
+                    placeholder="Habit name..." 
+                    className={styles.habitInputFull}
+                    value={newHabitTitle}
+                    onChange={(e) => setNewHabitTitle(e.target.value)}
+                    autoFocus={isAddingHabit}
+                  />
+                </div>
+                
+                {newHabitType !== 'checkbox' && (
+                  <div className={styles.formRow}>
+                    <input 
+                      type="number" 
+                      placeholder={newHabitType === 'timer' ? 'Target in minutes...' : 'Target value...'} 
+                      className={styles.targetInput}
+                      value={newHabitTarget}
+                      onChange={(e) => setNewHabitTarget(e.target.value)}
+                      required
+                      min="1"
+                    />
+                  </div>
                 )}
+                
+                <div className={styles.formActions}>
+                  <button type="submit" className={styles.addBtn}>Save Habit</button>
+                  {habits.length > 0 && <button type="button" className={styles.cancelBtn} onClick={() => setIsAddingHabit(false)}>Cancel</button>}
+                </div>
               </form>
             )}
             
@@ -314,35 +323,26 @@ function Dashboard({ session }) {
                 <p>Awesome! Now add a specific daily task above to start making progress.</p>
               </div>
             ) : (
-              habits.map((habit) => {
-                const isCompletedToday = completions.some(c => c.habit_id === habit.id && c.completed_date === todayStr);
-
-                return (
-                  <div key={habit.id} className={`${styles.habitCard} ${isCompletedToday ? styles.completed : ''}`}>
-                    <div className={styles.habitMeta}>
-                      <span className={styles.icon}>{habit.icon}</span>
-                      <div>
-                        <h3>{habit.title}</h3>
-                        <p>Daily Routine</p>
-                      </div>
-                    </div>
-                    
-                    <div className={styles.habitActions}>
-                      <button className={styles.deleteBtn} onClick={() => deleteHabit(habit.id)}>🗑️</button>
-                      <button 
-                        className={isCompletedToday ? styles.checkButton : styles.emptyCircle}
-                        onClick={() => toggleCompletion(habit.id)}
-                      >
-                        {isCompletedToday ? '✓' : ''}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
+              habits.map((habit) => (
+                <HabitCard 
+                  key={habit.id} 
+                  habit={habit} 
+                  todayStr={todayStr}
+                  completions={completions} 
+                  setCompletions={setCompletions}
+                  onDelete={() => {
+                    supabase.from('habits').delete().eq('id', habit.id).then(() => {
+                      setHabits(habits.filter(h => h.id !== habit.id));
+                    });
+                  }}
+                  onUpdateTitle={(newTitle) => {
+                    setHabits(habits.map(h => h.id === habit.id ? { ...h, title: newTitle } : h));
+                  }}
+                />
+              ))
             )}
           </section>
 
-          {/* Feature 3: Visual Calendar */}
           <section className={styles.calendarWidget}>
             <h2>Progress Calendar (Last 28 Days)</h2>
             <div className={styles.grid}>
@@ -359,6 +359,178 @@ function Dashboard({ session }) {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+// Sub-component for individual habits to manage their own progress/timer state
+function HabitCard({ habit, todayStr, completions, setCompletions, onDelete, onUpdateTitle }) {
+  const completion = completions.find(c => c.habit_id === habit.id && c.completed_date === todayStr);
+  const currentProgress = completion ? completion.progress_value : 0;
+  const isCompleted = currentProgress >= habit.target_value;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(habit.title);
+
+  // Timer state
+  const [isRunning, setIsRunning] = useState(false);
+  const [timerSeconds, setTimerSeconds] = useState(currentProgress);
+  const intervalRef = useRef(null);
+
+  // Sync timer when externally updated
+  useEffect(() => {
+    if (!isRunning) setTimerSeconds(currentProgress);
+  }, [currentProgress, isRunning]);
+
+  // Stopwatch Logic
+  useEffect(() => {
+    if (isRunning) {
+      intervalRef.current = setInterval(() => {
+        setTimerSeconds(prev => {
+           const next = prev + 1;
+           if (next >= habit.target_value) {
+              clearInterval(intervalRef.current);
+              setIsRunning(false);
+              updateProgress(next);
+           }
+           return next;
+        });
+      }, 1000);
+    } else {
+      clearInterval(intervalRef.current);
+    }
+    return () => clearInterval(intervalRef.current);
+  }, [isRunning, habit.target_value]);
+
+  async function updateProgress(newProgress) {
+    if (newProgress < 0) newProgress = 0;
+    if (newProgress > habit.target_value) newProgress = habit.target_value;
+    
+    if (completion) {
+      if (newProgress === 0) {
+        await supabase.from('completions').delete().eq('id', completion.id);
+        setCompletions(prev => prev.filter(c => c.id !== completion.id));
+      } else {
+        await supabase.from('completions').update({ progress_value: newProgress }).eq('id', completion.id);
+        setCompletions(prev => prev.map(c => c.id === completion.id ? { ...c, progress_value: newProgress } : c));
+      }
+    } else if (newProgress > 0) {
+      const { data } = await supabase.from('completions').insert([{ 
+        habit_id: habit.id, 
+        completed_date: todayStr,
+        progress_value: newProgress
+      }]).select();
+      if (data) setCompletions(prev => [...prev, data[0]]);
+    }
+  }
+
+  function formatTime(totalSeconds) {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  async function saveEdit() {
+    if (!editTitle.trim()) return;
+    await supabase.from('habits').update({ title: editTitle }).eq('id', habit.id);
+    onUpdateTitle(editTitle);
+    setIsEditing(false);
+  }
+
+  // Calculate Progress Bar width
+  const progressPercent = Math.min(100, Math.round((currentProgress / habit.target_value) * 100));
+
+  return (
+    <div className={`${styles.habitCard} ${isCompleted ? styles.completed : ''}`}>
+      <div className={styles.habitContentArea}>
+        <div className={styles.habitMeta}>
+          <span className={styles.icon}>{habit.icon}</span>
+          <div style={{ flex: 1 }}>
+            {isEditing ? (
+              <div className={styles.editRow}>
+                <input 
+                  type="text" 
+                  value={editTitle} 
+                  onChange={(e) => setEditTitle(e.target.value)} 
+                  className={styles.goalEditInput}
+                  autoFocus
+                />
+                <button onClick={saveEdit} className={styles.saveBtn}>Save</button>
+                <button onClick={() => setIsEditing(false)} className={styles.cancelSmallBtn}>X</button>
+              </div>
+            ) : (
+              <h3 className={styles.habitTitle}>
+                {habit.title} 
+                <button className={styles.inlineEditBtn} onClick={() => setIsEditing(true)}>✏️</button>
+              </h3>
+            )}
+            
+            {/* Progress Bar for non-checkbox types */}
+            {habit.type !== 'checkbox' && (
+              <div className={styles.progressBarBg}>
+                <div className={styles.progressBarFill} style={{ width: `${isRunning ? Math.min(100, (timerSeconds/habit.target_value)*100) : progressPercent}%` }}></div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.habitActions}>
+        <button className={styles.deleteBtn} onClick={onDelete}>🗑️</button>
+
+        {/* 1. Checkbox Logic */}
+        {habit.type === 'checkbox' && (
+          <button 
+            className={isCompleted ? styles.checkButton : styles.emptyCircle}
+            onClick={() => updateProgress(isCompleted ? 0 : 1)}
+          >
+            {isCompleted ? '✓' : ''}
+          </button>
+        )}
+
+        {/* 2. Incremental Logic */}
+        {habit.type === 'incremental' && (
+          <div className={styles.controlGroup}>
+            <button className={styles.circleBtn} onClick={() => updateProgress(currentProgress - 1)}>-</button>
+            <span className={styles.progressText}>{currentProgress} / {habit.target_value}</span>
+            <button className={styles.circleBtn} onClick={() => updateProgress(currentProgress + 1)}>+</button>
+          </div>
+        )}
+
+        {/* 3. Numerical Logic */}
+        {habit.type === 'numerical' && (
+          <div className={styles.controlGroup}>
+            <input 
+              type="number" 
+              className={styles.numberInlineInput}
+              value={currentProgress === 0 ? "" : currentProgress}
+              placeholder="0"
+              onChange={(e) => updateProgress(parseInt(e.target.value) || 0)}
+            />
+            <span className={styles.progressText}>/ {habit.target_value}</span>
+          </div>
+        )}
+
+        {/* 4. Timer Logic */}
+        {habit.type === 'timer' && (
+          <div className={styles.controlGroup}>
+            <span className={styles.progressText}>{formatTime(timerSeconds)} / {formatTime(habit.target_value)}</span>
+            {isCompleted ? (
+              <span className={styles.completedBadge}>✓</span>
+            ) : (
+              <button 
+                className={`${styles.playBtn} ${isRunning ? styles.running : ''}`} 
+                onClick={() => {
+                  if (isRunning) { setIsRunning(false); updateProgress(timerSeconds); }
+                  else { setIsRunning(true); }
+                }}
+              >
+                {isRunning ? '⏸' : '▶'}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
