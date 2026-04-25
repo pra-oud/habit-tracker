@@ -368,11 +368,14 @@ function Dashboard({ session }) {
               {calendarDays.map((dateObj) => {
                 const dateStr = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + String(dateObj.getDate()).padStart(2, '0');
                 const dayNum = dateObj.getDate();
+                const isToday = dateStr === todayStr;
                 const count = completionsPerDay[dateStr] || 0;
                 let cellClass = styles.gridCell;
                 if (count === 1) cellClass += ` ${styles.activeCell1}`;
                 else if (count === 2) cellClass += ` ${styles.activeCell2}`;
                 else if (count >= 3) cellClass += ` ${styles.activeCell3}`;
+                
+                if (isToday) cellClass += ` ${styles.todayCell}`;
                 
                 return (
                   <div key={dateStr} className={cellClass} title={`${count} completed on ${dateStr}`}>

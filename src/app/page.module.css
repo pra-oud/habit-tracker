@@ -397,11 +397,13 @@
 .controlGroup {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   background: white;
   padding: 4px 8px;
   border-radius: 20px;
   border: 1px solid var(--border-color);
+  min-width: 140px;
 }
 .circleBtn {
   width: 28px;
@@ -559,6 +561,12 @@
   font-size: 10px;
   color: rgba(0,0,0,0.3);
   font-weight: 600;
+}
+.todayCell {
+  border: 2px solid #4a7541;
+  box-shadow: 0 0 10px rgba(74, 117, 65, 0.4);
+  transform: scale(1.1);
+  z-index: 10;
 }
 .activeCell1 { background-color: #ccebc5; }
 .activeCell2 { background-color: #a8ddb5; }
